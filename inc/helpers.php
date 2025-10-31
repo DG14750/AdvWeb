@@ -5,6 +5,6 @@
 function h($s){ return htmlspecialchars($s ?? "", ENT_QUOTES, 'UTF-8'); }
 
 function rating_fill($n){      // returns 0–100% width
-  $n = max(0, min(100, floatval($n)));  // make sure $n stays between 0 and 100
+  $n = max(0, min(100, floatval($n)));  // Ensure $n is a float between 0 and 100
   return $n."%";                        // append % so it can be used in CSS width
 }

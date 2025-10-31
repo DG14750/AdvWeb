@@ -3,11 +3,11 @@
 // Purpose: Upsert games using Steam metadata, save Steam cover -> WebP, and update image_url.
 
 require __DIR__ . '/../inc/db.php';
-require __DIR__ . '/../inc/adjust_image.php'; // your save_cover_image() with resize -> webp
+require __DIR__ . '/../inc/adjust_image.php';
 
 /* ----------------------------------------------------
-   Input list (Steam app IDs + your fallbacks).
-   We’ll query Steam for name/desc/year/genres/platforms.
+   Input list (Steam app IDs + fallbacks).
+   Query Steam for name/desc/year/genres/platforms.
    If Steam doesn’t return something, we keep the fallback.
    ---------------------------------------------------- */
 $items = [
@@ -43,9 +43,9 @@ function steam_cover(int $appId): string {
   return "https://cdn.cloudflare.steamstatic.com/steam/apps/{$appId}/library_600x900.jpg";
 }
 
-// Fetch and parse Steam Storefront metadata for one app
+// Fetch Steam Storefront metadata for one app
 function steam_appdetails(int $appId): ?array {
-  // l=en = English text; cc=gb = UK date formats (adjust if you like)
+  // l=en = English text; cc=gb = UK date formats
   $url  = "https://store.steampowered.com/api/appdetails?appids={$appId}&l=en&cc=gb";
   $json = @file_get_contents($url);
   if (!$json) return null;
@@ -88,7 +88,7 @@ function steam_appdetails(int $appId): ?array {
     'description'  => $desc,
     'release_year' => $releaseYear,
     'genre'        => $genre,
-    'platform'     => $platform, // PC/Mac/Linux only
+    'platform'     => $platform,
     'rating'       => $rating,   // may be null
   ];
 }
@@ -124,13 +124,13 @@ foreach ($items as $row) {
   // 1) Get Steam metadata (may be null or partial)
   $meta = steam_appdetails((int)$steamId);
 
-  // 2) Merge Steam fields with your fallbacks (Steam first, then fallback)
+  // 2) Merge Steam fields with fallbacks (Steam first, then fallback)
   $title    = $meta['title']        ?? $fbTitle;
   $desc     = $meta['description']  ?? $fbDesc;
   $year     = $meta['release_year'] ?? $fbYear;
   $genre    = $meta['genre']        ?? $fbGenre;
 
-  // Platforms: Steam only knows PC/Mac/Linux — merge with your console string if present
+  // Platforms: 
   if (!empty($meta['platform'])) {
     // Avoid duplicate "PC" etc. when merging
     $parts = array_map('trim', array_filter(array_merge(
@@ -143,7 +143,7 @@ foreach ($items as $row) {
     $platform = $fbPlatform;
   }
 
-  // Rating: prefer Steam’s Metacritic score if present; else keep your fallback
+  // Rating: prefer Steam’s Metacritic score if present; else keep use fallback
   $rating = isset($meta['rating']) ? (int)$meta['rating'] : (int)$fbRating;
 
   // 3) Upsert base row (image_url left empty for now)
@@ -162,10 +162,10 @@ foreach ($items as $row) {
   if ($saved) {
     $updImg->bind_param('ss', $saved, $title);
     $updImg->execute();
-    echo "✅ {$title} → {$saved}<br>";
+    echo "{$title} → {$saved}<br>";
     $ok++;
   } else {
-    echo "⚠️  Cover failed for {$title} (URL: {$coverUrl})<br>";
+    echo "Cover failed for {$title} (URL: {$coverUrl})<br>";
     $fail++;
   }
 }

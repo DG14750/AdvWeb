@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/inc/db.php';
 require_once __DIR__ . '/inc/helpers.php';
+require_once __DIR__ . '/inc/auth.php';
+
 
 // 1) Tab handling (decides default ORDER BY)
 $tab = $_GET['tab'] ?? 'home';
@@ -81,6 +83,12 @@ if ($q !== '') {
       <a class="<?= $tab==='top'?'active':'' ?>" href="index.php?tab=top"><i class="fa-solid fa-star"></i> Top Rated</a>
       <a class="<?= $tab==='fav'?'active':'' ?>" href="index.php?tab=fav"><i class="fa-regular fa-heart"></i> Favourites</a>
       <a class="<?= $tab==='new'?'active':'' ?>" href="index.php?tab=new"><i class="fa-solid fa-bolt"></i> New Releases</a>
+      <?php if (is_logged_in()): ?>
+        <a href="/adv-web/GameSeerr/auth_logout.php">Log out</a>
+          <?php else: ?>
+            <a href="/adv-web/GameSeerr/auth_login.php">Log in</a>
+            <a href="/adv-web/GameSeerr/auth_signup.php">Sign up</a>
+          <?php endif; ?>
     </nav>
   </aside>
 
