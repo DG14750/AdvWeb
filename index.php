@@ -157,7 +157,7 @@ if (is_logged_in()) {
       <a class="<?= $tab==='trending'?'active':'' ?>" href="index.php?tab=trending"><i class="fa-solid fa-fire"></i> Trending</a>
       <a class="<?= $tab==='upcoming'?'active':'' ?>" href="index.php?tab=upcoming"><i class="fa-regular fa-calendar"></i> Upcoming</a>
       <a class="<?= $tab==='top'?'active':'' ?>" href="index.php?tab=top"><i class="fa-solid fa-star"></i> Top Rated</a>
-      <a class="<?= $tab==='fav'?'active':'' ?>" href="index.php?tab=fav"><i class="fa-regular fa-heart"></i> Favourites</a>
+      <a class="<?= $tab==='fav'?'active':'' ?>" href="index.php?tab=fav"><i class="fa-regular fa-heart"></i> Wishlist</a>
       <a class="<?= $tab==='new'?'active':'' ?>" href="index.php?tab=new"><i class="fa-solid fa-bolt"></i> New Releases</a>
 
       <?php if (is_logged_in()): ?>
