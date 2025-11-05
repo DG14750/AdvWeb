@@ -1,5 +1,6 @@
 <?php
-// Escape HTML safely and calculate rating bar width
+// Stolen from stack overflow cause I like it better than stars
+// Calculate rating bar width
 // h($s): converts special characters to HTML entities to prevent XSS
 // rating_fill($n): converts a number (0–100) to a percentage string like "85%"
 function h($s){ return htmlspecialchars($s ?? "", ENT_QUOTES, 'UTF-8'); }

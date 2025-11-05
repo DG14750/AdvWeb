@@ -1,4 +1,12 @@
 <?php
+// auth_signup.php
+// -------------------------------------------
+// Registration form:
+// - Validates username/email/password
+// - Prevents duplicates
+// - Stores password hashes
+// - Uses CSRF + flash
+// -------------------------------------------
 require __DIR__ . '/inc/db.php';
 require __DIR__ . '/inc/helpers.php';
 require __DIR__ . '/inc/auth.php';
@@ -14,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pass     = $_POST['password'] ?? '';
     $pass2    = $_POST['password2'] ?? '';
 
+    // Basic validation
     if ($username === '' || $email === '' || $pass === '' || $pass2 === '') {
       $err = 'Please fill in all fields.';
     } elseif (!preg_match('/^[A-Za-z0-9_.-]{3,32}$/', $username)) {
@@ -25,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($pass) < 6) {
       $err = 'Password must be at least 6 characters.';
     } else {
-      // unique checks
+      // Uniqueness check
       $s = $conn->prepare('SELECT id FROM users WHERE email=? OR username=? LIMIT 1');
       $s->bind_param('ss', $email, $username);
       $s->execute();
@@ -35,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($exists) {
         $err = 'That email or username is already taken.';
       } else {
+        // Insert with secure hash
         $hash = password_hash($pass, PASSWORD_DEFAULT);
         $ins = $conn->prepare('INSERT INTO users (username, email, password) VALUES (?,?,?)');
         $ins->bind_param('sss', $username, $email, $hash);
@@ -53,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Sign up – GameSeerr</title>
+  <title>Sign up GameSeerr</title>
   <link rel="stylesheet" href="/adv-web/GameSeerr/assets/css/styles.css">
   <style>
     .auth-wrap{max-width:420px;margin:60px auto;padding:24px;background:var(--panel);border-radius:14px;box-shadow:0 6px 18px rgb(0 0 0 /.25)}
@@ -80,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php if ($err): ?><div class="err"><?= h($err) ?></div><?php endif; ?>
       <?php if ($m = flash_get('ok')): ?><div class="ok"><?= h($m) ?></div><?php endif; ?>
 
+      <!-- POST with CSRF token -->
       <form method="post">
         <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
         <div class="field"><label>Username</label><input name="username" required></div>

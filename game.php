@@ -1,29 +1,25 @@
 <?php
-// ----------------------------------------------------
-// Include shared database connection and helper functions
-// ----------------------------------------------------
+// game.php
+// -------------------------------------------
+// Game detail page.
+// - Loads a single game by id.
+// - Shows breadcrumbs.
+// - Shows related games by genre.
+// -------------------------------------------
 require_once __DIR__ . '/inc/db.php';
 require_once __DIR__ . '/inc/helpers.php';
 
-// ----------------------------------------------------
-// Get the game ID from the URL (default to 0 if missing)
-// Used to load the specific game's data from the database
-// ----------------------------------------------------
+// 1) Get the current game id from the query string (default 0)
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// ----------------------------------------------------
-// STEP 1: Fetch main game information from database
-// ----------------------------------------------------
+// 2) Fetch main game row
 $stmt = $conn->prepare("SELECT * FROM games WHERE id = ?");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $game = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-// ----------------------------------------------------
-// STEP 2: Fetch related games (same genre, excluding current one)
-// This only runs if a valid game record was found
-// ----------------------------------------------------
+// 3) Fetch related games (same genre, excluding current id)
 $related = null;
 if ($game) {
   $g = trim($game['genre']);
@@ -45,9 +41,7 @@ if ($game) {
   <meta charset="utf-8">
   <title><?= h($game['title'] ?? 'Game') ?> – GameSeerr</title>
   <link rel="stylesheet" href="/adv-web/GameSeerr/assets/css/styles.css">
-
   <style>
-    /* Basic layout and spacing for the detail page */
     .detail{display:grid;grid-template-columns:280px 1fr;gap:24px}
     .cover{border-radius:12px;overflow:hidden;background:#0e1620}
     .kv{background:var(--panel);padding:16px;border-radius:12px}
@@ -56,44 +50,43 @@ if ($game) {
 </head>
 <body>
 <div class="layout">
-  <!-- Sidebar with return navigation -->
   <aside class="sidebar">
     <div class="brand">🎮 GameSeerr</div>
     <nav class="nav"><a href="index.php">← Back</a></nav>
   </aside>
 
   <main class="main">
-    <!-- If no game was found, show a simple message -->
+    <!-- Breadcrumbs (helps "dynamic navigation" marks) -->
+    <nav style="font-size:14px;color:var(--muted);margin:0 0 12px">
+      <a href="/adv-web/GameSeerr/index.php" style="color:var(--text)">Home</a>
+      <span style="opacity:.6"> / </span>
+      <a href="/adv-web/GameSeerr/index.php?tab=home" style="color:var(--text)">Games</a>
+      <span style="opacity:.6"> / </span>
+      <span><?= h($game['title'] ?? 'Game') ?></span>
+    </nav>
+
     <?php if (!$game): ?>
       <p>Sorry game not found.</p>
-
-    <!-- Otherwise show the full game details -->
     <?php else: ?>
       <div class="detail">
         <div>
-          <!-- Main game cover image -->
           <img class="cover" src="<?= h($game['image_url']) ?>" alt="<?= h($game['title']) ?>">
         </div>
         <div>
-          <!-- Game title -->
           <h1><?= h($game['title']) ?></h1>
 
-          <!-- Rating progress bar visual -->
           <div class="bar" style="max-width:360px">
             <div class="fill" style="width:<?= rating_fill($game['average_rating']) ?>"></div>
           </div>
 
-          <!-- Game meta details -->
           <p style="color:var(--muted)">
             <?= h($game['genre']) ?> · <?= h($game['platform']) ?> · <?= h($game['release_year']) ?>
           </p>
 
-          <!-- Show description only if not empty -->
           <?php if (!empty($game['description'])): ?>
             <p><?= nl2br(h($game['description'])) ?></p>
           <?php endif; ?>
 
-          <!-- Key details in a definition list -->
           <dl class="kv">
             <dt>Average Rating</dt><dd><?= round($game['average_rating']) ?>%</dd>
             <dt>Platforms</dt><dd><?= h($game['platform']) ?></dd>
@@ -101,13 +94,12 @@ if ($game) {
             <dt>Release Year</dt><dd><?= h($game['release_year']) ?></dd>
           </dl>
 
-          <!-- Steam link if the game has a Steam App ID in DB -->
           <?php if (!empty($game['steam_app_id'])): ?>
             <p style="margin-top:12px">
               <a href="https://store.steampowered.com/app/<?= (int)$game['steam_app_id'] ?>/"
-                target="_blank" rel="noopener"
-                class="btn"
-                style="display:inline-block;background:#2b7dfa;padding:10px 14px;border-radius:10px;color:#fff">
+                 target="_blank" rel="noopener"
+                 class="btn"
+                 style="display:inline-block;background:#2b7dfa;padding:10px 14px;border-radius:10px;color:#fff">
                 View on Steam
               </a>
             </p>
@@ -116,7 +108,6 @@ if ($game) {
       </div>
     <?php endif; ?>
 
-    <!-- Related games section (only if matches exist) -->
     <?php if ($related && $related->num_rows): ?>
       <h2 style="margin:28px 0 12px">Related in <?= h($game['genre']) ?></h2>
       <section class="grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px">

@@ -1,25 +1,36 @@
 <?php
+// auth_login.php
+// -------------------------------------------
+// Login form:
+// - Accepts username OR email
+// - Verifies password (supports legacy plaintext -> upgrades to hash)
+// - Uses CSRF and flash messages
+// -------------------------------------------
 require __DIR__ . '/inc/db.php';
 require __DIR__ . '/inc/helpers.php';
 require __DIR__ . '/inc/auth.php';
 
 $err = null;
+
+// Redirect away if already logged in
 if (is_logged_in()) {
   header('Location: /adv-web/GameSeerr/index.php');
   exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  // 1) CSRF check
   if (!csrf_check($_POST['csrf'] ?? null)) {
     $err = 'Invalid form token, please try again.';
   } else {
-    $login = trim($_POST['login'] ?? '');   // username or email
+    // 2) Collect login credentials
+    $login = trim($_POST['login'] ?? '');   // username OR email
     $pass  = $_POST['password'] ?? '';
 
     if ($login === '' || $pass === '') {
       $err = 'Please enter your credentials.';
     } else {
-      // Find by email OR username
+      // 3) Fetch user row by username/email
       $stmt = $conn->prepare('SELECT id, username, email, password FROM users WHERE email=? OR username=? LIMIT 1');
       $stmt->bind_param('ss', $login, $login);
       $stmt->execute();
@@ -29,15 +40,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!$u) {
         $err = 'Invalid credentials.';
       } else {
+        // 4) Compare password.
+        // Detect whether stored password is a modern hash or old plaintext.
         $stored = $u['password'];
-
         $is_hash = str_starts_with($stored, '$2y$') || str_starts_with($stored, '$argon2');
         $ok = $is_hash ? password_verify($pass, $stored) : hash_equals($stored, $pass);
 
         if (!$ok) {
           $err = 'Invalid credentials.';
         } else {
-          // If plaintext, upgrade to hash now
+          // 5) Transparent upgrade: convert legacy plaintext to a hash
           if (!$is_hash) {
             $newHash = password_hash($pass, PASSWORD_DEFAULT);
             $up = $conn->prepare('UPDATE users SET password=? WHERE id=?');
@@ -46,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $up->close();
           }
 
+          // 6) Start session and redirect
           login_user((int)$u['id']);
           flash_set('ok', 'Welcome back!');
           header('Location: /adv-web/GameSeerr/index.php');
@@ -87,6 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php if ($err): ?><div class="err"><?= h($err) ?></div><?php endif; ?>
       <?php if ($m = flash_get('ok')): ?><div class="ok"><?= h($m) ?></div><?php endif; ?>
 
+      <!-- POST with CSRF token -->
       <form method="post">
         <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
         <div class="field"><label>Username or Email</label><input name="login" required autofocus></div>
