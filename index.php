@@ -18,7 +18,7 @@ switch ($tab) {
   case 'new':
   case 'upcoming':  $order = "release_year DESC, id DESC"; break;
   case 'trending':  $order = "id DESC"; break;  // placeholder
-  case 'fav':       $order = "id DESC"; break;  // placeholder (future auth feature)
+  case 'wish':       $order = "id DESC"; break;  // placeholder
   default:          $order = "id DESC";
 }
 
@@ -72,7 +72,7 @@ if ($q !== '') {
   }
 }
 
-// 5) Load username for the welcome chip (if logged in) Need to move elsewhere maybe top!!!
+// 5) Load username for the welcome chip (if logged in)
 $displayName = null;
 if (is_logged_in()) {
   $uid = current_user_id();
@@ -92,15 +92,15 @@ if (is_logged_in()) {
   <title>GameSeerr - Discover</title>
   <link rel="stylesheet" href="/adv-web/GameSeerr/assets/css/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <!-- jQuery (for rubric: we will use $.ajax for live search updates) -->
+  <!-- jQuery (for rubric: I will use $.ajax for live search updates) -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"
           integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
           crossorigin="anonymous"></script>
   <script>
     // -----------------------------------------------
-    // jQuery AJAX live search (Rubric requirement)
+    // jQuery AJAX live search
     // - On typing in the search box or changing genre,
-    //   we call ajax_search.php and replace the grid.
+    //   Call ajax_search.php and replace the grid.
     // - Debounced to reduce requests while typing.
     // -----------------------------------------------
     $(function(){
@@ -125,7 +125,6 @@ if (is_logged_in()) {
           dataType: 'html',     // server returns HTML cards we can drop in
           success: function(html){
             $grid.html(html);   // update grid without page reload
-            // Optionally, update a count badge if server included it via data-* attr
             const n = $('#grid').find('[data-card]').length;
             $count.text(n + ' results');
           },
@@ -141,9 +140,6 @@ if (is_logged_in()) {
       });
       // Immediate fetch on genre change
       $genre.on('change', fetchResults);
-      // Optional: initial fetch to demonstrate async even on first load
-      // Comment out if you prefer the initial PHP-rendered results only.
-      // fetchResults();
     });
   </script>
 </head>
@@ -157,7 +153,7 @@ if (is_logged_in()) {
       <a class="<?= $tab==='trending'?'active':'' ?>" href="index.php?tab=trending"><i class="fa-solid fa-fire"></i> Trending</a>
       <a class="<?= $tab==='upcoming'?'active':'' ?>" href="index.php?tab=upcoming"><i class="fa-regular fa-calendar"></i> Upcoming</a>
       <a class="<?= $tab==='top'?'active':'' ?>" href="index.php?tab=top"><i class="fa-solid fa-star"></i> Top Rated</a>
-      <a class="<?= $tab==='fav'?'active':'' ?>" href="index.php?tab=fav"><i class="fa-regular fa-heart"></i> Wishlist</a>
+      <a class="<?= $tab==='wish'?'active':'' ?>" href="index.php?tab=fav"><i class="fa-regular fa-heart"></i> Wishlist</a>
       <a class="<?= $tab==='new'?'active':'' ?>" href="index.php?tab=new"><i class="fa-solid fa-bolt"></i> New Releases</a>
 
       <?php if (is_logged_in()): ?>
@@ -203,7 +199,7 @@ if (is_logged_in()) {
     <section class="grid" id="grid">
       <?php if ($res && $res->num_rows): ?>
         <?php while ($g = $res->fetch_assoc()): ?>
-          <!-- data-card attr helps us count cards after AJAX updates -->
+          <!-- data-card attr helps count cards after AJAX updates -->
           <a data-card class="card" href="/adv-web/GameSeerr/game.php?id=<?= (int)$g['id'] ?>">
             <img src="/adv-web/GameSeerr/<?= h($g['image_url']) ?>"
                  alt="<?= h($g['title']) ?>"
