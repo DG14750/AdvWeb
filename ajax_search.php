@@ -1,31 +1,26 @@
 <?php
 // ajax_search.php
-// -----------------------------------------------
-// Returns ONLY the cards HTML for the grid.
-// Called by jQuery $.ajax from index.php.
-// Accepts: q (search), genre (filter), tab (for ORDER BY).
-// -----------------------------------------------
 require_once __DIR__ . '/inc/db.php';
 require_once __DIR__ . '/inc/helpers.php';
 
-// 1) Read inputs (GET)
-$q        = trim($_GET['q'] ?? '');
-$genre    = trim($_GET['genre'] ?? '');
-$tab      = $_GET['tab'] ?? 'home';
+// 1) Inputs
+$q     = trim($_GET['q'] ?? '');
+$genre = trim($_GET['genre'] ?? '');
+$tab   = $_GET['tab'] ?? 'home';
 
-// 2) Sort order logic
+// 2) Sort order
 switch ($tab) {
   case 'top':       $order = "average_rating DESC"; break;
   case 'new':
-  case 'upcoming':  $order = "release_year DESC, id DESC"; break; // Need to add upcoming games!!
+  case 'upcoming':  $order = "release_year DESC, id DESC"; break;
   case 'trending':  $order = "id DESC"; break;
-  case 'fav':       $order = "id DESC"; break;
+  case 'wish':      $order = "id DESC"; break;  // renamed from fav -> wish
   default:          $order = "id DESC";
 }
 
 $baseSql = "SELECT id,title,genre,platform,average_rating,image_url FROM games";
 
-// 3) Build prepared statement based on q + genre
+// 3) Query (prepared)
 if ($q !== '') {
   if ($genre !== '') {
     $stmt = $conn->prepare("$baseSql
@@ -56,14 +51,20 @@ $stmt->execute();
 $res = $stmt->get_result();
 $stmt->close();
 
-// 4) Emit just the <a class="card">…</a> items (same as index.php)
+// 4) Emit only the cards (RELATIVE paths)
 if ($res && $res->num_rows) {
   while ($g = $res->fetch_assoc()) {
+
+    // normalise image path: keep http(s) as-is; otherwise strip any leading slash
+    $img = $g['image_url'] ?? '';
+    if (strpos($img, 'http://') !== 0 && strpos($img, 'https://') !== 0) {
+      $img = ltrim($img, '/'); // e.g. "assets/covers/xyz.webp"
+    }
     ?>
-    <a data-card class="card" href="/adv-web/GameSeerr/game.php?id=<?= (int)$g['id'] ?>">
-      <img src="/adv-web/GameSeerr/<?= h($g['image_url']) ?>"
+    <a data-card class="card" href="game.php?id=<?= (int)$g['id'] ?>">
+      <img src="<?= h($img) ?>"
            alt="<?= h($g['title']) ?>"
-           onerror="this.src='/adv-web/GameSeerr/assets/img/placeholder.webp'">
+           onerror="this.src='assets/img/placeholder.webp'">
       <div class="meta">
         <div class="title"><?= h($g['title']) ?></div>
         <div class="badge"><?= h($g['genre']) ?> · <?= h($g['platform']) ?></div>
