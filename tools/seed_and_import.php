@@ -188,7 +188,7 @@ foreach ($appIds as $steamId) {
   if ($steamRating !== null && (int)$steamRating > 0) {
     $rating = (int)$steamRating;             // Steam provided score
   } elseif ($currentDbRating === null) {
-    $rating = rand(60, 95);                  // both missing → generate
+    $rating = rand(60, 95);                  // both missing then generate
   } else {
     $rating = null;                          // preserve DB rating via COALESCE
   }

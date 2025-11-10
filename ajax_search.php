@@ -14,7 +14,7 @@ switch ($tab) {
   case 'new':
   case 'upcoming':  $order = "release_year DESC, id DESC"; break;
   case 'trending':  $order = "id DESC"; break;
-  case 'wish':      $order = "id DESC"; break;  // renamed from fav -> wish
+  case 'wish':      $order = "id DESC"; break; 
   default:          $order = "id DESC";
 }
 
@@ -55,7 +55,7 @@ $stmt->close();
 if ($res && $res->num_rows) {
   while ($g = $res->fetch_assoc()) {
 
-    // normalise image path: keep http(s) as-is; otherwise strip any leading slash
+    // normalise image path:
     $img = $g['image_url'] ?? '';
     if (strpos($img, 'http://') !== 0 && strpos($img, 'https://') !== 0) {
       $img = ltrim($img, '/'); // e.g. "assets/covers/xyz.webp"

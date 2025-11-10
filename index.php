@@ -93,7 +93,7 @@ if (is_logged_in()) {
 <head>
   <meta charset="utf-8">
   <title>GameSeerr - Discover</title>
-  <!-- ✅ relative paths -->
+  <!-- relative paths -->
   <link rel="stylesheet" href="assets/css/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
@@ -115,7 +115,7 @@ if (is_logged_in()) {
           tab: $('input[name="tab"]').val() || 'home'
         };
         $.ajax({
-          url: 'ajax_search.php',   // ✅ relative path
+          url: 'ajax_search.php',   // relative path
           method: 'GET',
           data: data,
           dataType: 'html',
