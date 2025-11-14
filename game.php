@@ -40,7 +40,12 @@ if ($game) {
 <head>
   <meta charset="utf-8">
   <title><?= h($game['title'] ?? 'Game') ?> – GameSeerr</title>
-  <link rel="stylesheet" href="/adv-web/GameSeerr/assets/css/styles.css">
+   <?php
+    // Works whether the folder is /GameSeerr, /adv-web/GameSeerr, or anything else
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
+  ?>
+  <base href="<?= htmlspecialchars($base) ?>">
+  <link rel="stylesheet" href="assets/css/styles.css">
   <style>
     .detail{display:grid;grid-template-columns:280px 1fr;gap:24px}
     .cover{border-radius:12px;overflow:hidden;background:#0e1620}
@@ -58,9 +63,9 @@ if ($game) {
   <main class="main">
     <!-- Breadcrumbs (helps "dynamic navigation" marks) -->
     <nav style="font-size:14px;color:var(--muted);margin:0 0 12px">
-      <a href="/adv-web/GameSeerr/index.php" style="color:var(--text)">Home</a>
+      <a href="index.php" style="color:var(--text)">Home</a>
       <span style="opacity:.6"> / </span>
-      <a href="/adv-web/GameSeerr/index.php?tab=home" style="color:var(--text)">Games</a>
+      <a href="index.php?tab=home" style="color:var(--text)">Games</a>
       <span style="opacity:.6"> / </span>
       <span><?= h($game['title'] ?? 'Game') ?></span>
     </nav>
@@ -80,7 +85,7 @@ if ($game) {
           </div>
 
           <p style="color:var(--muted)">
-            <?= h($game['genre']) ?> · <?= h($game['platform']) ?> · <?= h($game['release_year']) ?>
+            <?= h($game['genre']) ?> · <?= h($game['platform']) ?> · <?= h($game['release_date']) ?>
           </p>
 
           <?php if (!empty($game['description'])): ?>
@@ -91,7 +96,7 @@ if ($game) {
             <dt>Average Rating</dt><dd><?= round($game['average_rating']) ?>%</dd>
             <dt>Platforms</dt><dd><?= h($game['platform']) ?></dd>
             <dt>Genre</dt><dd><?= h($game['genre']) ?></dd>
-            <dt>Release Year</dt><dd><?= h($game['release_year']) ?></dd>
+            <dt>Release Date</dt><dd><?= h($game['release_date']) ?></dd>
           </dl>
 
           <?php if (!empty($game['steam_app_id'])): ?>
@@ -112,12 +117,12 @@ if ($game) {
       <h2 style="margin:28px 0 12px">Related in <?= h($game['genre']) ?></h2>
       <section class="grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px">
         <?php while($r = $related->fetch_assoc()): ?>
-          <a class="card" href="/adv-web/GameSeerr/game.php?id=<?= (int)$r['id'] ?>"
+          <a class="card" href="game.php?id=<?= (int)$r['id'] ?>"
              style="background:var(--panel);border-radius:12px;overflow:hidden">
-            <img src="/adv-web/GameSeerr/<?= h($r['image_url']) ?>"
+            <img src="<?= h($r['image_url']) ?>"
                  alt="<?= h($r['title']) ?>"
                  style="width:100%;aspect-ratio:2/3;object-fit:cover"
-                 onerror="this.src='/adv-web/GameSeerr/assets/img/placeholder.webp'">
+                 onerror="this.src='assets/img/placeholder.webp'">
             <div class="meta" style="padding:8px 10px">
               <div class="title" style="font-weight:600;font-size:14px;line-height:1.2">
                 <?= h($r['title']) ?>

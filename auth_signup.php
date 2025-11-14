@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ins->close();
 
         flash_set('ok', 'Account created! Please sign in.');
-        header('Location: /adv-web/GameSeerr/auth_login.php');
+        header('Location: auth_login.php');
         exit;
       }
     }
@@ -64,7 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8">
   <title>Sign up GameSeerr</title>
-  <link rel="stylesheet" href="/adv-web/GameSeerr/assets/css/styles.css">
+   <?php
+    // Works whether the folder is /GameSeerr, /adv-web/GameSeerr, or anything else
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
+  ?>
+  <base href="<?= htmlspecialchars($base) ?>">
+  <link rel="stylesheet" href="assets/css/styles.css">
   <style>
     .auth-wrap{max-width:420px;margin:60px auto;padding:24px;background:var(--panel);border-radius:14px;box-shadow:0 6px 18px rgb(0 0 0 /.25)}
     .field{display:flex;flex-direction:column;margin:10px 0}
@@ -79,8 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <aside class="sidebar">
     <div class="brand">🎮 GameSeerr</div>
     <nav class="nav">
-      <a class="active" href="/adv-web/GameSeerr/auth_signup.php">Sign up</a>
-      <a href="/adv-web/GameSeerr/auth_login.php">Log in</a>
+      <a class="active" href="auth_signup.php">Sign up</a>
+      <a href="auth_login.php">Log in</a>
     </nav>
   </aside>
 
@@ -98,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="field"><label>Password</label><input type="password" name="password" minlength="6" required></div>
         <div class="field"><label>Confirm password</label><input type="password" name="password2" minlength="6" required></div>
         <button class="btn" type="submit">Sign up</button>
-        <p class="muted" style="margin-top:10px">Already have an account? <a href="/adv-web/GameSeerr/auth_login.php">Log in</a>.</p>
+        <p class="muted" style="margin-top:10px">Already have an account? <a href="auth_login.php">Log in</a>.</p>
       </form>
     </div>
   </main>

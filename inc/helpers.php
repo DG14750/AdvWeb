@@ -9,3 +9,13 @@ function rating_fill($n){      // returns 0–100% width
   $n = max(0, min(100, floatval($n)));  // Ensure $n is a float between 0 and 100
   return $n."%";                        // append % so it can be used in CSS width
 }
+
+// Helpers to redirect 
+function app_base(): string {
+  return rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
+}
+
+function redirect(string $path): void {
+  header('Location: ' . app_base() . ltrim($path, '/'));
+  exit;
+}

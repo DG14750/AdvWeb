@@ -6,6 +6,7 @@
 // - Verifies password (supports legacy plaintext -> upgrades to hash)
 // - Uses CSRF and flash messages
 // -------------------------------------------
+
 require __DIR__ . '/inc/db.php';
 require __DIR__ . '/inc/helpers.php';
 require __DIR__ . '/inc/auth.php';
@@ -14,7 +15,7 @@ $err = null;
 
 // Redirect away if already logged in
 if (is_logged_in()) {
-  header('Location: /adv-web/GameSeerr/index.php');
+  header('Location: index.php');
   exit;
 }
 
@@ -61,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           // 6) Start session and redirect
           login_user((int)$u['id']);
           flash_set('ok', 'Welcome back!');
-          header('Location: /adv-web/GameSeerr/index.php');
+          header('Location: index.php');
           exit;
         }
       }
@@ -74,7 +75,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8">
   <title>Log in – GameSeerr</title>
-  <link rel="stylesheet" href="/adv-web/GameSeerr/assets/css/styles.css">
+   <?php
+    // Works whether the folder is /GameSeerr, /adv-web/GameSeerr, or anything else
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
+  ?>
+  <base href="<?= htmlspecialchars($base) ?>">
+  <link rel="stylesheet" href="assets/css/styles.css">
   <style>
     .auth-wrap{max-width:420px;margin:60px auto;padding:24px;background:var(--panel);border-radius:14px;box-shadow:0 6px 18px rgb(0 0 0 /.25)}
     .field{display:flex;flex-direction:column;margin:10px 0}
@@ -89,8 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <aside class="sidebar">
     <div class="brand">🎮 GameSeerr</div>
     <nav class="nav">
-      <a class="active" href="/adv-web/GameSeerr/auth_login.php">Log in</a>
-      <a href="/adv-web/GameSeerr/auth_signup.php">Sign up</a>
+      <a class="active" href="auth_login.php">Log in</a>
+      <a href="auth_signup.php">Sign up</a>
     </nav>
   </aside>
 
@@ -106,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="field"><label>Username or Email</label><input name="login" required autofocus></div>
         <div class="field"><label>Password</label><input type="password" name="password" required></div>
         <button class="btn" type="submit">Log in</button>
-        <p class="muted" style="margin-top:10px">No account? <a href="/adv-web/GameSeerr/auth_signup.php">Create one</a>.</p>
+        <p class="muted" style="margin-top:10px">No account? <a href="auth_signup.php">Create one</a>.</p>
       </form>
     </div>
   </main>

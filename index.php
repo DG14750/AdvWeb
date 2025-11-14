@@ -1,11 +1,4 @@
 <?php
-  // Works whether the folder is /GameSeerr, /adv-web/GameSeerr, or anything else
-  $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
-?>
-<base href="<?= htmlspecialchars($base) ?>">
-
-
-<?php
 // index.php
 // -----------------------------
 // Home/listing page.
@@ -92,7 +85,12 @@ if (is_logged_in()) {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>GameSeerr - Discover</title>
+  <title>🎮 GameSeerr - Discover</title>
+   <?php
+    // Works whether the folder is /GameSeerr, /adv-web/GameSeerr, or anything else
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
+  ?>
+  <base href="<?= htmlspecialchars($base) ?>">
   <!-- relative paths -->
   <link rel="stylesheet" href="assets/css/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -140,7 +138,7 @@ if (is_logged_in()) {
 <body>
 <div class="layout">
   <aside class="sidebar">
-    <div class="brand">GameSeerr</div>
+    <div class="brand">🎮 GameSeerr</div>
     <nav class="nav">
       <a class="<?= $tab==='home'?'active':'' ?>" href="index.php"><i class="fa-solid fa-house"></i> Home</a>
       <a class="<?= $tab==='trending'?'active':'' ?>" href="index.php?tab=trending"><i class="fa-solid fa-fire"></i> Trending</a>

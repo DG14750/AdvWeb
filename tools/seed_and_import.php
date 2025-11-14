@@ -100,11 +100,8 @@ function steam_appdetails(int $appId): ?array {
 
   $desc = $d['short_description'] ?? '';
 
-  $releaseYear = null;
-  if (!empty($d['release_date']['date']) &&
-      preg_match('/\b(19|20)\d{2}\b/', $d['release_date']['date'], $m)) {
-    $releaseYear = (int)$m[0];
-  }
+$releaseDate = $d['release_date']['date'] ?? null;
+
 
   $genre = '';
   if (!empty($d['genres'])) {
@@ -123,7 +120,7 @@ function steam_appdetails(int $appId): ?array {
   return [
     'title'        => $title,
     'description'  => $desc,
-    'release_year' => $releaseYear,
+    'release_date' => $releaseDate,
     'genre'        => $genre,
     'platform'     => $platform,
     'rating'       => $rating,
@@ -135,17 +132,17 @@ function steam_appdetails(int $appId): ?array {
    - average_rating only updates when provided (COALESCE)
    =========================================================== */
 $ins = $conn->prepare("
-  INSERT INTO games (title, genre, platform, release_year, description, image_url, average_rating, steam_app_id)
+  INSERT INTO games (title, genre, platform, release_date, description, image_url, average_rating, steam_app_id)
   VALUES (?, ?, ?, ?, ?, '', ?, ?)
   ON DUPLICATE KEY UPDATE
     title=VALUES(title),
     genre=VALUES(genre),
     platform=VALUES(platform),
-    release_year=VALUES(release_year),
+    release_date=VALUES(release_date),
     description=VALUES(description),
     average_rating=COALESCE(VALUES(average_rating), average_rating)
 ");
-$ins->bind_param('sssisii', $title, $genre, $platform, $year, $desc, $rating, $steamId);
+$ins->bind_param('ssssiii', $title, $genre, $platform, $date, $desc, $rating, $steamId);
 
 $updImg = $conn->prepare("UPDATE games SET image_url=? WHERE steam_app_id=?");
 $updImg->bind_param('si', $savedPath, $steamId);
@@ -170,7 +167,7 @@ foreach ($appIds as $steamId) {
 
   $title    = $meta['title'];
   $desc     = $meta['description'] ?? '';
-  $year     = $meta['release_year'] ?? null;
+  $date     = $meta['release_date'] ?? null;
   $genre    = $meta['genre'] ?? '';
   $platform = $meta['platform'] ?? '';
 
