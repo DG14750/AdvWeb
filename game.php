@@ -2,27 +2,40 @@
 // game.php
 // -------------------------------------------
 // Game detail page.
-// - Loads a single game by id.
-// - Shows breadcrumbs.
-// - Shows related games by genre.
 // -------------------------------------------
 require_once __DIR__ . '/inc/db.php';
 require_once __DIR__ . '/inc/helpers.php';
+require_once __DIR__ . '/inc/auth.php';
 
-// 1) Get the current game id from the query string (default 0)
+// 1) Get the current game id
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// 2) Fetch main game row
+// 2) Fetch game row
 $stmt = $conn->prepare("SELECT * FROM games WHERE id = ?");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $game = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
+// Detect wishlist status
+$isInWishlist = false;
+if ($game && is_logged_in()) {
+    $uid = current_user_id();
+    $w = $conn->prepare("SELECT 1 FROM wishlist WHERE user_id=? AND game_id=? LIMIT 1");
+    $w->bind_param("ii", $uid, $id);
+    $w->execute();
+    $w->store_result();
+    $isInWishlist = $w->num_rows > 0;
+    $w->close();
+}
+
 // 3) Fetch related games (same genre, excluding current id)
 $related = null;
 if ($game) {
-  $g = trim($game['genre']);
+  // Use primary genre term so matching is symmetric
+  $genreTokens   = preg_split('/\s*,\s*/', $game['genre']);
+  $primaryGenre  = trim($genreTokens[0] ?? '');
+
   $rel = $conn->prepare("
     SELECT id, title, image_url, average_rating
     FROM games
@@ -30,30 +43,87 @@ if ($game) {
     ORDER BY average_rating DESC
     LIMIT 6
   ");
-  $rel->bind_param("is", $game['id'], $g);
+  $rel->bind_param("is", $game['id'], $primaryGenre);
   $rel->execute();
   $related = $rel->get_result();
+  $rel->close();
 }
+
 ?>
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title><?= h($game['title'] ?? 'Game') ?> – GameSeerr</title>
-   <?php
-    // Works whether the folder is /GameSeerr, /adv-web/GameSeerr, or anything else
-    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
-  ?>
-  <base href="<?= htmlspecialchars($base) ?>">
-  <link rel="stylesheet" href="assets/css/styles.css">
-  <style>
-    .detail{display:grid;grid-template-columns:280px 1fr;gap:24px}
+<meta charset="utf-8">
+<title><?= h($game['title'] ?? 'Game') ?> – GameSeerr</title>
+
+<?php
+$base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
+?>
+<base href="<?= htmlspecialchars($base) ?>">
+
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+    .detail {display:grid;grid-template-columns:280px 1fr;gap:24px}
     .cover{border-radius:12px;overflow:hidden;background:#0e1620}
     .kv{background:var(--panel);padding:16px;border-radius:12px}
     .kv dt{color:var(--muted)} .kv dd{margin:0 0 10px}
-  </style>
+
+    /* nicer layout for title + wishlist button */
+    .detail-header {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:16px;
+    }
+    .detail-header h1 { margin:0; }
+
+    /* reuse existing heart styles */
+    .heart-btn {
+      position: relative;
+      background:none;
+      border:none;
+      cursor:pointer;
+      font-size: 26px;
+      color:#666;
+    }
+    .heart-btn.is-active { color:#e63946; }
+</style>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<!-- Wishlist JS -->
+<script>
+$(function () {
+    $('#detail-heart').on('click', function(e) {
+        e.preventDefault();
+
+        const $btn = $(this);
+        const gameId = $btn.data('game-id');
+
+        $.post('wishlist_toggle.php', { game_id: gameId }, function(resp) {
+            if (!resp) return;
+
+            if (resp.status === 'added') {
+                $btn.addClass('is-active');
+            } else if (resp.status === 'removed') {
+                $btn.removeClass('is-active');
+            } else if (resp.status === 'login') {
+                window.location.href = 'auth_login.php';
+            }
+        }, 'json').fail(function() {
+            alert('Sorry, could not update your wishlist.');
+        });
+    });
+});
+</script>
+
 </head>
 <body>
+
 <div class="layout">
   <aside class="sidebar">
     <div class="brand">🎮 GameSeerr</div>
@@ -61,7 +131,8 @@ if ($game) {
   </aside>
 
   <main class="main">
-    <!-- Breadcrumbs (helps "dynamic navigation" marks) -->
+
+    <!-- Breadcrumb -->
     <nav style="font-size:14px;color:var(--muted);margin:0 0 12px">
       <a href="index.php" style="color:var(--text)">Home</a>
       <span style="opacity:.6"> / </span>
@@ -72,13 +143,29 @@ if ($game) {
 
     <?php if (!$game): ?>
       <p>Sorry game not found.</p>
+
     <?php else: ?>
       <div class="detail">
+
         <div>
           <img class="cover" src="<?= h($game['image_url']) ?>" alt="<?= h($game['title']) ?>">
         </div>
+
         <div>
-          <h1><?= h($game['title']) ?></h1>
+
+          <!-- title + wishlist button -->
+          <div class="detail-header">
+            <h1><?= h($game['title']) ?></h1>
+
+            <?php if (is_logged_in()): ?>
+              <button id="detail-heart"
+                      class="heart-btn <?= $isInWishlist ? 'is-active' : '' ?>"
+                      data-game-id="<?= $id ?>"
+                      aria-label="Toggle Wishlist">
+                <i class="fa-solid fa-heart"></i>
+              </button>
+            <?php endif; ?>
+          </div>
 
           <div class="bar" style="max-width:360px">
             <div class="fill" style="width:<?= rating_fill($game['average_rating']) ?>"></div>
@@ -109,6 +196,7 @@ if ($game) {
               </a>
             </p>
           <?php endif; ?>
+
         </div>
       </div>
     <?php endif; ?>
@@ -135,7 +223,9 @@ if ($game) {
         <?php endwhile; ?>
       </section>
     <?php endif; ?>
+
   </main>
 </div>
+
 </body>
 </html>
