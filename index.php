@@ -8,16 +8,57 @@ require_once __DIR__ . '/inc/db.php';
 require_once __DIR__ . '/inc/helpers.php';
 require_once __DIR__ . '/inc/auth.php';
 
-// 1) Decide default ORDER BY based on tab
+// 1) Decide tab + ORDER BY
 $tab = $_GET['tab'] ?? 'home';
+
+// "Upcoming" is stored as text in release_date, so we use a text-based rule.
+$upcomingClause = "(
+    release_date = 'To be announced'
+    OR release_date LIKE '%2026%'
+)";
+
+// Flags for which extra filter we want
+$useUpcoming  = false;
+
 switch ($tab) {
-  case 'top':       $order = "average_rating DESC"; break;
+  case 'upcoming':
+    $order       = "id DESC";
+    $useUpcoming = true;
+    break;
+
+  case 'top':
+    $order = "average_rating DESC";
+    break;
+
   case 'new':
-  case 'upcoming':  $order = "release_date DESC, id DESC"; break;
-  case 'trending':  $order = "id DESC"; break;
-  case 'wish':      $order = "title ASC"; break;
-  default:          $order = "id DESC";
+    // Extract numeric year from release_date and sort newest first
+    $order = "CAST(REGEXP_SUBSTR(release_date, '[0-9]{4}') AS UNSIGNED) DESC,
+              id DESC";
+    break;
+
+  case 'wish':
+    $order = "title ASC";
+    break;
+
+  default:
+    $order = "title ASC";
+    break;
 }
+
+// Build a single filter clause based on the selected tab
+$filterClauseParts = [];
+
+if ($useUpcoming) {
+    $filterClauseParts[] = $upcomingClause;
+}
+$filterClause = '';
+if ($filterClauseParts) {
+    $filterClause = implode(' AND ', $filterClauseParts);
+}
+
+// These are what we actually plug into SQL
+$andFilter   = $filterClause ? " AND $filterClause"   : "";
+$whereFilter = $filterClause ? " WHERE $filterClause" : "";
 
 // 2) Build distinct genre list for <select>
 $genresRes = $conn->query("SELECT DISTINCT genre FROM games ORDER BY genre ASC");
@@ -34,45 +75,46 @@ sort($genres, SORT_NATURAL | SORT_FLAG_CASE);
 $q        = trim($_GET['q'] ?? '');
 $selGenre = trim($_GET['genre'] ?? '');
 
-// Base SELECT for games
-$baseSql = "SELECT id,title,genre,platform,average_rating,image_url FROM games";
+// Base SELECT
+$baseSql = "SELECT id,title,genre,platform,average_rating,image_url,release_date FROM games";
 
-// Are we on the wishlist tab AND logged in?
+// Wishlist-only?
 $wishlistOnly = ($tab === 'wish' && is_logged_in());
 $uid = $wishlistOnly ? current_user_id() : null;
 
-// 4) Server-side data (for initial load / no-JS fallback)
+// 4) Server-side filtering
 if ($q !== '') {
-    // There is a search term
     $like = "%{$q}%";
 
     if ($selGenre !== '') {
-        // Search + genre filter
         if ($wishlistOnly) {
             $stmt = $conn->prepare("$baseSql
               WHERE (title LIKE ? OR genre LIKE ? OR platform LIKE ? OR description LIKE ?)
                 AND genre LIKE CONCAT('%', ?, '%')
                 AND id IN (SELECT game_id FROM wishlist WHERE user_id=?)
+                $andFilter
               ORDER BY $order");
             $stmt->bind_param("sssssi", $like, $like, $like, $like, $selGenre, $uid);
         } else {
             $stmt = $conn->prepare("$baseSql
               WHERE (title LIKE ? OR genre LIKE ? OR platform LIKE ? OR description LIKE ?)
                 AND genre LIKE CONCAT('%', ?, '%')
+                $andFilter
               ORDER BY $order");
             $stmt->bind_param("sssss", $like, $like, $like, $like, $selGenre);
         }
     } else {
-        // Search only
         if ($wishlistOnly) {
             $stmt = $conn->prepare("$baseSql
               WHERE (title LIKE ? OR genre LIKE ? OR platform LIKE ? OR description LIKE ?)
                 AND id IN (SELECT game_id FROM wishlist WHERE user_id=?)
+                $andFilter
               ORDER BY $order");
             $stmt->bind_param("ssssi", $like, $like, $like, $like, $uid);
         } else {
             $stmt = $conn->prepare("$baseSql
               WHERE (title LIKE ? OR genre LIKE ? OR platform LIKE ? OR description LIKE ?)
+                $andFilter
               ORDER BY $order");
             $stmt->bind_param("ssss", $like, $like, $like, $like);
         }
@@ -83,18 +125,18 @@ if ($q !== '') {
     $stmt->close();
 
 } else {
-    // No search term
     if ($selGenre !== '') {
-        // Genre filter only
         if ($wishlistOnly) {
             $stmt = $conn->prepare("$baseSql
               WHERE genre LIKE CONCAT('%', ?, '%')
                 AND id IN (SELECT game_id FROM wishlist WHERE user_id=?)
+                $andFilter
               ORDER BY $order");
             $stmt->bind_param("si", $selGenre, $uid);
         } else {
             $stmt = $conn->prepare("$baseSql
               WHERE genre LIKE CONCAT('%', ?, '%')
+                $andFilter
               ORDER BY $order");
             $stmt->bind_param("s", $selGenre);
         }
@@ -104,18 +146,18 @@ if ($q !== '') {
         $stmt->close();
 
     } else {
-        // No search, no genre filter
         if ($wishlistOnly) {
             $stmt = $conn->prepare("$baseSql
               WHERE id IN (SELECT game_id FROM wishlist WHERE user_id=?)
+                $andFilter
               ORDER BY $order");
             $stmt->bind_param("i", $uid);
             $stmt->execute();
             $res = $stmt->get_result();
             $stmt->close();
         } else {
-            // Plain home / other tabs
-            $res = $conn->query("$baseSql ORDER BY $order");
+            // plain home / upcoming / new / other tabs
+            $res = $conn->query("$baseSql $whereFilter ORDER BY $order");
         }
     }
 }
@@ -133,11 +175,10 @@ if (is_logged_in()) {
   $uS->close();
 }
 
-// 6) Wishlist set for current user (for hearts)
+// 6) Wishlist for hearts
 $wishlistIds = [];
 if (is_logged_in()) {
   $uid = current_user_id();
-  // table name = wishlist (singular) with columns: id, user_id, game_id
   $w = $conn->prepare('SELECT game_id FROM wishlist WHERE user_id=?');
   $w->bind_param('i', $uid);
   $w->execute();
@@ -153,18 +194,14 @@ if (is_logged_in()) {
 <head>
   <meta charset="utf-8">
   <title>🎮 GameSeerr - Discover</title>
-  <?php
-    // Works whether the folder is /GameSeerr, /adv-web/GameSeerr, etc.
-    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
-  ?>
+  <?php $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/'; ?>
   <base href="<?= htmlspecialchars($base) ?>">
 
   <link rel="stylesheet" href="assets/css/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"
-          integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
-          crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
   <script>
     $(function () {
       const $q     = $('input[name="q"]');
@@ -181,185 +218,240 @@ if (is_logged_in()) {
         };
         $.ajax({
           url: 'ajax_search.php',
-          method: 'GET',
           data: data,
+          method: 'GET',
           dataType: 'html',
-          success: function (html) {
+          success(html){
             $grid.html(html);
-            const n = $('#grid').find('[data-card]').length;
-            if ($count.length) {
-              $count.text(n + ' results');
-            }
-          },
-          error: function () {
-            $grid.html('<p style="color:#f88">Error loading results.</p>');
+            const n = $grid.find('[data-card]').length;
+            if ($count.length) $count.text(n + ' results');
           }
         });
       }
 
-      $q.on('input', function () {
-        clearTimeout(timer);
-        timer = setTimeout(fetchResults, 250);
-      });
-
+      $q.on('input', () => { clearTimeout(timer); timer = setTimeout(fetchResults, 250); });
       $genre.on('change', fetchResults);
 
-      // Wishlist heart click handler
-      $(document).on('click', '.heart-btn', function (e) {
+      // wishlist toggle
+      $(document).on('click', '.heart-btn', function(e){
         e.preventDefault();
-        e.stopPropagation(); // don't trigger card link
-
-        const $btn   = $(this);
-        const gameId = $btn.data('game-id');
-
-        $.post('wishlist_toggle.php', { game_id: gameId }, function (resp) {
+        e.stopPropagation();
+        const btn = $(this);
+        $.post('wishlist_toggle.php', {game_id:btn.data('game-id')}, resp => {
           if (!resp) return;
-
-          if (resp.status === 'added') {
-              $btn.addClass('is-active');
-          } 
+          if (resp.status === 'added') btn.addClass('is-active');
           else if (resp.status === 'removed') {
-              $btn.removeClass('is-active');
-
-              // If user is on wishlist tab → remove the whole card from screen
-              if ($('input[name="tab"]').val() === 'wish') {
-                  $btn.closest('[data-card]').fadeOut(200, function () {
-                      $(this).remove();
-                  });
-              }
-          } 
-          else if (resp.status === 'login') {
-              window.location.href = 'auth_login.php';
+            btn.removeClass('is-active');
+            if ($('input[name="tab"]').val() === 'wish')
+              btn.closest('[data-card]').fadeOut(200, function(){ $(this).remove(); });
+          } else if (resp.status === 'login') {
+            window.location='auth_login.php';
           }
-      }, 'json');
+        }, 'json');
       });
+
     });
   </script>
 </head>
-<body>
-<div class="layout">
-  <aside class="sidebar">
-    <div class="brand">🎮 GameSeerr</div>
-    <nav class="nav">
-      <a class="<?= $tab === 'home'      ? 'active' : '' ?>" href="index.php"><i class="fa-solid fa-house"></i> Home</a>
-      <a class="<?= $tab === 'trending'  ? 'active' : '' ?>" href="index.php?tab=trending"><i class="fa-solid fa-fire"></i> Trending</a>
-      <a class="<?= $tab === 'upcoming'  ? 'active' : '' ?>" href="index.php?tab=upcoming"><i class="fa-regular fa-calendar"></i> Upcoming</a>
-      <a class="<?= $tab === 'top'       ? 'active' : '' ?>" href="index.php?tab=top"><i class="fa-solid fa-star"></i> Top Rated</a>
-      <a class="<?= $tab === 'wish'      ? 'active' : '' ?>" href="index.php?tab=wish"><i class="fa-regular fa-heart"></i> Wishlist</a>
-      <a class="<?= $tab === 'new'       ? 'active' : '' ?>" href="index.php?tab=new"><i class="fa-solid fa-bolt"></i> New Releases</a>
 
-      <?php if (is_logged_in()): ?>
-        <a href="auth_logout.php">Log out</a>
-      <?php else: ?>
-        <a href="auth_login.php">Log in</a>
-        <a href="auth_signup.php">Sign up</a>
-      <?php endif; ?>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">
+        <i class="fa-solid fa-gamepad"></i>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title">GameSeerr</div>
+        <div class="brand-sub">Discover games</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a class="<?= $tab === 'home'      ? 'active' : '' ?>" href="index.php">
+        <span class="nav-icon"><i class="fa-solid fa-house"></i></span>
+        <span class="nav-label">Home</span>
+      </a>
+      <a class="<?= $tab === 'upcoming'  ? 'active' : '' ?>" href="index.php?tab=upcoming">
+        <span class="nav-icon"><i class="fa-regular fa-calendar"></i></span>
+        <span class="nav-label">Upcoming</span>
+      </a>
+      <a class="<?= $tab === 'top'       ? 'active' : '' ?>" href="index.php?tab=top">
+        <span class="nav-icon"><i class="fa-solid fa-star"></i></span>
+        <span class="nav-label">Top Rated</span>
+      </a>
+      <a class="<?= $tab === 'new'       ? 'active' : '' ?>" href="index.php?tab=new">
+        <span class="nav-icon"><i class="fa-solid fa-bolt"></i></span>
+        <span class="nav-label">Newest</span>
+      </a>
+      <a class="<?= $tab === 'wish'      ? 'active' : '' ?>" href="index.php?tab=wish">
+        <span class="nav-icon"><i class="fa-regular fa-heart"></i></span>
+        <span class="nav-label">Wishlist</span>
+      </a>
     </nav>
+
+    <div class="sidebar-auth">
+      <?php if (is_logged_in()): ?>
+        <a href="auth_logout.php" class="auth-link">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span>Log out</span>
+        </a>
+      <?php else: ?>
+        <a href="auth_login.php" class="auth-link">
+          <i class="fa-regular fa-circle-user"></i>
+          <span>Log in</span>
+        </a>
+        <a href="auth_signup.php" class="auth-link secondary">
+          <i class="fa-solid fa-user-plus"></i>
+          <span>Sign up</span>
+        </a>
+      <?php endif; ?>
+    </div>
+
+    <div class="sidebar-footer-pill">
+      <div class="pill-main">GameSeerr</div>
+      <div class="pill-sub">Adv Web Project</div>
+    </div>
   </aside>
 
-  <main class="main">
-    <div class="main-wrap">
+  <!-- RIGHT SIDE COLUMN (content + footer) -->
+  <div class="main-column">
 
-      <form class="topbar" method="get" action="index.php">
-        <input type="hidden" name="tab" value="<?= h($tab) ?>">
+    <main class="main">
+      <div class="main-wrap">
 
-        <input class="search" type="search" name="q" placeholder="Search games"
-               value="<?= h($_GET['q'] ?? '') ?>">
+        <!-- TOPBAR -->
+        <form class="topbar" method="get" action="index.php">
+          <input type="hidden" name="tab" value="<?= h($tab) ?>">
+          <input class="search" type="search" name="q"
+                 placeholder="Search games"
+                 value="<?= h($_GET['q'] ?? '') ?>">
 
-        <div class="topbar-right">
-          <div class="select-wrap">
-            <select name="genre" class="genre-select">
-              <option value="">All genres</option>
-              <?php foreach ($genres as $g): ?>
-                <option value="<?= h($g) ?>" <?= $selGenre === $g ? 'selected' : '' ?>><?= h($g) ?></option>
-              <?php endforeach; ?>
-            </select>
+          <div class="topbar-right">
+            <div class="select-wrap">
+              <select name="genre" class="genre-select">
+                <option value="">All genres</option>
+                <?php foreach ($genres as $g): ?>
+                  <option value="<?= h($g) ?>" <?= $selGenre===$g?'selected':'' ?>>
+                    <?= h($g) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+
+            <?php if ($displayName): ?>
+              <span class="welcome-chip">👋 Welcome, <?= h($displayName) ?></span>
+            <?php endif; ?>
           </div>
+        </form>
 
-          <?php if ($displayName): ?>
-            <span class="welcome-chip">👋 Welcome, <?= h($displayName) ?></span>
-          <?php endif; ?>
-        </div>
-      </form>
+        <!-- GAME GRID -->
+        <section class="grid" id="grid">
+          <?php if ($res && $res->num_rows): ?>
+            <?php while ($g = $res->fetch_assoc()): ?>
+              <?php
+                $gameId   = (int)$g['id'];
+                $inWish   = isset($wishlistIds[$gameId]);
+                $heartCls = 'heart-btn' . ($inWish ? ' is-active' : '');
 
-      <div class="banner">Featured Game Banner</div>
+                $score    = (float)$g['average_rating'];
+                $barClass = 'bar';
+                if ($score >= 80) {
+                    $barClass .= ' bar-good';
+                } elseif ($score >= 50) {
+                    $barClass .= ' bar-mid';
+                } else {
+                    $barClass .= ' bar-bad';
+                }
+              ?>
+              <a data-card class="card" href="game.php?id=<?= $gameId ?>">
+                <img src="<?= h($g['image_url']) ?>"
+                     onerror="this.src='assets/img/placeholder.webp'"
+                     alt="<?= h($g['title']) ?>">
 
-      <section class="grid" id="grid">
-        <?php if ($res && $res->num_rows): ?>
-          <?php while ($g = $res->fetch_assoc()): ?>
-            <?php
-              $gameId   = (int)$g['id'];
-              $inWish   = isset($wishlistIds[$gameId]);
-              $heartCls = $inWish ? 'heart-btn is-active' : 'heart-btn';
-            ?>
-            <a data-card class="card" href="game.php?id=<?= $gameId ?>">
-              <img src="<?= h($g['image_url']) ?>"
-                   alt="<?= h($g['title']) ?>"
-                   onerror="this.src='assets/img/placeholder.webp'">
+                <?php if (is_logged_in()): ?>
+                  <button class="<?= $heartCls ?>" data-game-id="<?= $gameId ?>">
+                    <i class="fa-solid fa-heart"></i>
+                  </button>
+                <?php endif; ?>
 
-              <?php if (is_logged_in()): ?>
-                <button type="button"
-                        class="<?= $heartCls ?>"
-                        data-game-id="<?= $gameId ?>"
-                        aria-label="Toggle wishlist">
-                  <i class="fa-solid fa-heart"></i>
-                </button>
-              <?php endif; ?>
-
-              <div class="meta">
-                <div class="title"><?= h($g['title']) ?></div>
-                <div class="badge"><?= h($g['genre']) ?> · <?= h($g['platform']) ?></div>
-                <div class="bar">
-                  <div class="fill" style="width:<?= rating_fill($g['average_rating']) ?>"></div>
+                <div class="meta">
+                  <div class="title"><?= h($g['title']) ?></div>
+                  <div class="badge">
+                    <?= h($g['genre']) ?> · <?= h($g['platform']) ?>
+                  </div>
+                  <div class="<?= $barClass ?>">
+                    <div class="fill" style="width:<?= rating_fill($score) ?>"></div>
+                  </div>
                 </div>
-              </div>
-            </a>
-          <?php endwhile; ?>
-        <?php else: ?>
-          <p>No games found.</p>
-        <?php endif; ?>
-      </section>
+              </a>
+            <?php endwhile; ?>
+          <?php else: ?>
+            <p>No games found.</p>
+          <?php endif; ?>
+        </section>
 
-    </div><!-- /.main-wrap -->
-  </main>
+      </div><!-- /.main-wrap -->
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div class="footer-inner">
+
+        <div class="footer-brand">
+          <div class="footer-icon"><i class="fa-solid fa-gamepad"></i></div>
+          <div class="footer-brand-text">
+            <div class="footer-title">GameSeerr</div>
+            <div class="footer-sub">A student project</div>
+          </div>
+        </div>
+
+        <div class="footer-links-group">
+          <div class="footer-links-title">Explore</div>
+          <a href="index.php?tab=top">Top rated</a>
+          <a href="index.php?tab=new">Newest</a>
+        </div>
+
+        <div class="footer-links-group">
+          <div class="footer-links-title">Account</div>
+          <?php if (is_logged_in()) { ?>
+            <a href="auth_logout.php">Log out</a>
+          <?php } else { ?>
+            <a href="auth_login.php">Log in</a>
+            <a href="auth_signup.php">Sign up</a>
+          <?php } ?>
+        </div>
+
+        <div class="footer-social">
+          <a href="https://twitter.com" target="_blank" rel="noopener">
+            <i class="fa-brands fa-twitter"></i>
+          </a>
+          <a href="https://facebook.com" target="_blank" rel="noopener">
+            <i class="fa-brands fa-facebook"></i>
+          </a>
+          <a href="https://instagram.com" target="_blank" rel="noopener">
+            <i class="fa-brands fa-instagram"></i>
+          </a>
+          <a href="https://youtube.com" target="_blank" rel="noopener">
+            <i class="fa-brands fa-youtube"></i>
+          </a>
+          <a href="https://tiktok.com" target="_blank" rel="noopener">
+            <i class="fa-brands fa-tiktok"></i>
+          </a>
+        </div>
+
+        <div class="footer-pill">
+          <div>GameSeerr v1.0</div>
+          <div class="footer-pill-sub">Advanced Web Project</div>
+        </div>
+
+      </div>
+    </footer>
+  </div><!-- /.main-column -->
 </div><!-- /.layout -->
-
-<footer class="footer">
-  <div class="site-footer-inner">
-    <div class="footer-logo">🎮 GameSeerr</div>
-
-    <p class="footer-tagline">
-      Discover, track and rate your favourite games.
-    </p>
-
-    <p class="footer-copy">
-      © <?= date('Y') ?> GameSeerr · A Student Project
-    </p>
-
-    <div class="footer-links">
-      <div class="footer-links-row">
-        <span>Explore:</span>
-        <a href="index.php?tab=top">Top rated</a>
-        <a href="index.php?tab=trending">Trending</a>
-        <a href="index.php?tab=new">New releases</a>
-      </div>
-
-      <div class="footer-links-row">
-        <span>Account:</span>
-        <a href="auth_login.php">Log in</a>
-        <a href="auth_signup.php">Sign up</a>
-      </div>
-    </div>
-
-    <div class="social-links">
-      <a href="https://x.com/"><i class="fa-brands fa-twitter"></i></a>
-      <a href="https://www.facebook.com/"><i class="fa-brands fa-facebook"></i></a>
-      <a href="https://www.instagram.com/"><i class="fa-brands fa-instagram"></i></a>
-      <a href="https://www.youtube.com/"><i class="fa-brands fa-youtube"></i></a>
-      <a href="https://www.tiktok.com/en/"><i class="fa-brands fa-tiktok"></i></a>
-    </div>
-  </div>
-</footer>
 
 </body>
 </html>

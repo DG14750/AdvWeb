@@ -1,0 +1,2 @@
+Need to sort footer out and make sidebar sticky. Need to get a move on with reviews.
+Need to add profile to edit details like email/password and maybe view/delete past reviews
