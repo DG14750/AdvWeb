@@ -67,13 +67,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($ext, $allowed, true)) {
             $errors[] = 'Avatar must be JPG, PNG or WEBP.';
         } else {
-            $uploadDir  = __DIR__ . '/assets/avatars/';
+            $uploadDir  = __DIR__ . '/uploads/avatars/';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0777, true);
             }
             $fileName   = 'user-' . $userId . '.' . $ext;
             $destAbs    = $uploadDir . $fileName;
-            $destRel    = 'assets/avatars/' . $fileName;
+            $destRel    = 'uploads/avatars/' . $fileName;
+
 
             if (!move_uploaded_file($tmpName, $destAbs)) {
                 $errors[] = 'Failed to upload avatar file.';
