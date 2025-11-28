@@ -324,29 +324,58 @@ if (is_logged_in()) {
       <div class="main-wrap">
 
         <!-- TOPBAR -->
-        <form class="topbar" method="get" action="index.php">
-          <input type="hidden" name="tab" value="<?= h($tab) ?>">
-          <input class="search" type="search" name="q"
-                 placeholder="Search games"
-                 value="<?= h($_GET['q'] ?? '') ?>">
+        <div class="topbar">
+          <form class="topbar-form" method="get" action="index.php">
+            <input type="hidden" name="tab" value="<?= h($tab) ?>">
 
-          <div class="topbar-right">
-            <div class="select-wrap">
-              <select name="genre" class="genre-select">
-                <option value="">All genres</option>
-                <?php foreach ($genres as $g): ?>
-                  <option value="<?= h($g) ?>" <?= $selGenre===$g?'selected':'' ?>>
-                    <?= h($g) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
+            <input class="search" type="search" name="q"
+                  placeholder="Search games"
+                  value="<?= h($_GET['q'] ?? '') ?>">
+
+            <div class="topbar-right">
+              <div class="select-wrap">
+                <select name="genre" class="genre-select">
+                  <option value="">All genres</option>
+                  <?php foreach ($genres as $g): ?>
+                    <option value="<?= h($g) ?>" <?= $selGenre===$g ? 'selected' : '' ?>>
+                      <?= h($g) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
             </div>
+          </form>
 
-            <?php if ($displayName): ?>
-              <span class="welcome-chip">👋 Welcome, <?= h($displayName) ?></span>
-            <?php endif; ?>
-          </div>
-        </form>
+          <?php if ($displayName): ?>
+
+              <?php
+                $uid = current_user_id();
+                $stmt = $conn->prepare("SELECT avatar_url FROM users WHERE id=?");
+                $stmt->bind_param('i', $uid);
+                $stmt->execute();
+                $avatarRow = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+                $avatarUrl = $avatarRow['avatar_url'] ?? null;
+              ?>
+
+              <a href="profile.php" class="profile-avatar-link">
+                <?php if ($avatarUrl): ?>
+                  <div class="avatar-circle topbar-avatar">
+                    <img src="<?= h($avatarUrl) ?>"
+                        alt="Avatar"
+                        class="avatar-img">
+                  </div>
+                <?php else: ?>
+                  <div class="avatar-circle topbar-avatar">
+                    <?= strtoupper($displayName[0]) ?>
+                  </div>
+                <?php endif; ?>
+              </a>
+
+          <?php endif; ?>
+
+        </div>
+
 
         <!-- GAME GRID -->
         <section class="grid" id="grid">
